@@ -24,6 +24,31 @@ class MemorySystem:
             with open(config.METADATA_PATH, "r", encoding="utf-8") as f:
                 self.metadata = json.load(f)
 
+    # ------------------------------------------------------------------
+    # Memory saving helpers
+    # ------------------------------------------------------------------
+    def should_save_to_memory(self, text: str, analysis: Dict[str, Any]) -> bool:
+        """Определяет, стоит ли сохранять сообщение в память."""
+        if len(text) > 500:
+            return False
+
+        importance = analysis.get("importance", "низкая")
+        if importance in ["высокая", "средняя"]:
+            return True
+
+        personal_keywords = [
+            "зовут",
+            "имя",
+            "работаю",
+            "живу",
+            "люблю",
+            "ненавижу",
+        ]
+        if any(keyword in text.lower() for keyword in personal_keywords):
+            return True
+
+        return False
+
     def _embed(self, text: str) -> np.ndarray:
         """Получение эмбеддинга через OpenAI."""
         headers = {
@@ -54,6 +79,17 @@ class MemorySystem:
         return results
 
     def save_to_vector_db(self, text: str, analysis: Dict[str, Any]):
+        if not self.should_save_to_memory(text, analysis):
+            return
+
+        if len(self.metadata) >= 100:
+            self.metadata = self.metadata[-90:]
+            self.index = faiss.IndexFlatIP(1536)
+            for item in self.metadata:
+                vec = self._embed(item["text"])
+                vec = np.expand_dims(vec, axis=0)
+                self.index.add(vec)
+
         vec = self._embed(text)
         vec = np.expand_dims(vec, axis=0)
         self.index.add(vec)

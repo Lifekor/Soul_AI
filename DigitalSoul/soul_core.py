@@ -28,9 +28,18 @@ class SoulCore:
             self.memory.save_to_vector_db(user_message, analysis)
 
         print(f"[DEBUG] Генерирую ответ через GPT-4o...")
-        response = cloud_brain.generate_response(user_message, analysis, memories)
+        print("Душа: ", end="", flush=True)
 
-        response = self.emotions.influence_tone(response)
+        response = cloud_brain.generate_response_stream(
+            user_message, analysis, memories
+        )
+
+        if self.emotions.current_emotion == "грусть":
+            print(" 😔", end="")
+        elif self.emotions.current_emotion == "радость":
+            print(" 😊", end="")
+
+        print()
         print(f"[DEBUG] Итоговый ответ готов")
 
         return response
