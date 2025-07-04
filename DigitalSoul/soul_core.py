@@ -5,11 +5,13 @@ from typing import Any, Dict, List
 from . import cloud_brain, local_brain
 from .emotion_engine import EmotionEngine
 from .memory_system import MemorySystem
+from .multi_memory import MultiLayerMemory
 
 
 class SoulCore:
     def __init__(self):
         self.memory = MemorySystem()
+        self.multi_memory = MultiLayerMemory()
         self.emotions = EmotionEngine()
 
     def process_message(self, user_message: str) -> str:
@@ -21,6 +23,7 @@ class SoulCore:
         print(f"[DEBUG] Текущая эмоция: {self.emotions.current_emotion}")
 
         memories = self.memory.search_similar(user_message, limit=3)
+        memories.extend(self.multi_memory.search_memories(user_message))
         print(f"[DEBUG] Найдено воспоминаний: {len(memories)}")
 
         if analysis.get("action_needed") == "запомнить":
@@ -33,6 +36,8 @@ class SoulCore:
         response = cloud_brain.generate_response_stream(
             user_message, analysis, memories
         )
+
+        self.multi_memory.add_interaction(user_message, response, analysis)
 
         if self.emotions.current_emotion == "грусть":
             print(" 😔", end="")
