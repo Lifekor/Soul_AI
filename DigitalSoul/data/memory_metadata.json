@@ -1,1 +1,32 @@
-[]
+[
+  {
+    "text": "Привет! Мне сегодня грустно...",
+    "analysis": {
+      "emotion_detected": "грусть",
+      "importance": "высокая",
+      "action_needed": "запомнить",
+      "response_tone": "сочувствующий"
+    },
+    "timestamp": "2025-07-04T19:53:20.704217"
+  },
+  {
+    "text": "Меня зовут Олег, запомни это",
+    "analysis": {
+      "emotion_detected": "грусть",
+      "importance": "высокая",
+      "action_needed": "запомнить",
+      "response_tone": "сочувствующий"
+    },
+    "timestamp": "2025-07-04T19:55:32.104824"
+  },
+  {
+    "text": "Как меня зовут?",
+    "analysis": {
+      "emotion_detected": "нежность",
+      "importance": "высокая",
+      "action_needed": "запомнить",
+      "response_tone": "спокойный"
+    },
+    "timestamp": "2025-07-04T19:55:50.843404"
+  }
+]
