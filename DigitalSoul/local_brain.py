@@ -2,8 +2,9 @@
 
 import json
 import re
+from datetime import datetime
 import requests
-from typing import Dict
+from typing import Any, Dict
 
 from . import config
 
@@ -137,3 +138,84 @@ action=запомнить"""
             "importance": "низкая",
             "action": "ничего",
         }
+
+
+def analyze_with_self_learning(user_message: str, soul_memory: Dict[str, Any]) -> Dict[str, Any]:
+    """Улучшенный анализ с самообучением на ошибках"""
+
+    learned_patterns = soul_memory.get("emotion_corrections", {})
+    for pattern, correct in learned_patterns.items():
+        if pattern.lower() in user_message.lower():
+            return correct
+
+    prompt = f"""Анализируй эмоцию в сообщении: "{user_message}"
+
+ВАЖНЫЕ ПРАВИЛА:
+- "не грустно", "уже лучше", "спасибо" = РАДОСТЬ, не грусть
+- "mon amour", "❤️", "<3" = НЕЖНОСТЬ/РАДОСТЬ  
+- "привет", "как дела" = importance: низкая
+- Только личные факты, имена, сильные эмоции = importance: высокая
+
+Примеры:
+"мне уже не грустно" → emotion=радость, importance=средняя
+"mon amour <3" → emotion=нежность, importance=средняя  
+"меня зовут Олег" → emotion=нейтрально, importance=высокая
+
+Ответь СТРОГО в формате:
+emotion=радость
+importance=средняя
+action=запомнить
+tone=игривый"""
+
+    result = call_llama_analysis(prompt)
+
+    if should_remember_for_correction(user_message, result):
+        save_analysis_for_review(user_message, result, soul_memory)
+
+    return result
+
+
+def call_llama_analysis(prompt: str) -> Dict[str, Any]:
+    payload = {"model": "llama3.2:3b", "prompt": prompt, "stream": False}
+    try:
+        response = requests.post(config.OLLAMA_URL, json=payload, timeout=10)
+        response.raise_for_status()
+        data = response.json().get("response", "")
+        result = {
+            "emotion_detected": "нейтрально",
+            "importance": "низкая",
+            "action_needed": "ничего",
+            "response_tone": "спокойный",
+        }
+        patterns = {
+            "emotion_detected": r"emotion=(\w+)",
+            "importance": r"importance=(\w+)",
+            "action_needed": r"action=(\w+)",
+            "response_tone": r"tone=(\w+)",
+        }
+        for key, rgx in patterns.items():
+            m = re.search(rgx, data)
+            if m:
+                result[key] = m.group(1)
+        return result
+    except Exception as e:
+        print(f"Ошибка анализа Llama: {e}")
+        return {
+            "emotion_detected": "нейтрально",
+            "importance": "низкая",
+            "action_needed": "ничего",
+            "response_tone": "спокойный",
+        }
+
+
+def should_remember_for_correction(message: str, analysis: Dict[str, Any]) -> bool:
+    return analysis.get("importance") == "высокая" and analysis.get("emotion_detected") == "грусть" and "не" in message.lower()
+
+
+def save_analysis_for_review(message: str, analysis: Dict[str, Any], soul_memory: Dict[str, Any]):
+    corrections = soul_memory.setdefault("pending_corrections", [])
+    corrections.append({
+        "message": message,
+        "analysis": analysis,
+        "timestamp": datetime.now().isoformat(),
+    })
