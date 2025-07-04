@@ -19,7 +19,7 @@ class MemorySystem:
         self.index = faiss.IndexFlatIP(1536)
         self.metadata: List[Dict[str, Any]] = []
         if os.path.exists(config.FAISS_INDEX_PATH):
-            faiss.read_index(config.FAISS_INDEX_PATH)
+            self.index = faiss.read_index(config.FAISS_INDEX_PATH)
         if os.path.exists(config.METADATA_PATH):
             with open(config.METADATA_PATH, "r", encoding="utf-8") as f:
                 self.metadata = json.load(f)
