@@ -1,6 +1,6 @@
 """Ядро души. Координирует работу модулей."""
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from . import cloud_brain, local_brain
 from .emotion_engine import EmotionEngine
@@ -8,6 +8,7 @@ from .faiss_unified_memory import FaissUnifiedMemory
 from .emotional_learning import EmotionalLearning
 from .soul_identity import SoulIdentity
 from .living_emotions import LivingEmotions
+from .living_core import LivingCore
 
 
 class SoulCore:
@@ -18,6 +19,7 @@ class SoulCore:
         self.emotional_learning = EmotionalLearning()
         self.soul_identity = SoulIdentity()
         self.living_emotions = LivingEmotions()
+        self.living_core = LivingCore()
 
     def process_message(self, user_message: str) -> str:
         print(f"[DEBUG] Анализирую сообщение: {user_message}")
@@ -67,6 +69,7 @@ class SoulCore:
 
         conversation_history = self.get_recent_conversation_history()
         memories = self.unified_memory.search_memories(user_message, limit=5)
+        core_context = self.living_core.get_current_context_for_prompt()
 
         print(f"[DEBUG] Найдено воспоминаний: {len(memories)}")
         for i, memory in enumerate(memories, 1):
@@ -95,8 +98,11 @@ class SoulCore:
         print(f"[DEBUG] Генерирую ответ через улучшенную систему...")
         print("Душа: ", end="", flush=True)
 
-        response = cloud_brain.generate_response_with_emotional_layers(
-            user_message, analysis, memory_texts
+        response = cloud_brain.generate_response_with_living_core(
+            user_message=user_message,
+            analysis=analysis,
+            memories=memory_texts,
+            living_context=core_context,
         )
 
         self.unified_memory.add_memory(
@@ -109,6 +115,8 @@ class SoulCore:
         self.emotional_learning.learn_from_conversation(
             user_message, response, analysis
         )
+
+        self._analyze_conversation_impact(user_message, response, analysis)
 
         if analysis.get("importance") == "высокая":
             self.soul_identity.update_core_prompt_autonomously(user_message)
@@ -148,3 +156,97 @@ class SoulCore:
             "трепет": "дрожащий",
         }
         return emotion_to_tone.get(emotion, "нежный")
+
+    def _analyze_conversation_impact(self, user_message: str, soul_response: str, analysis: Dict) -> None:
+        """Анализирует как диалог повлиял на душу"""
+
+        if self._is_significant_moment(user_message, analysis):
+            insight = self._extract_self_insight(user_message, soul_response)
+            if insight:
+                self.living_core.update_self_perception(insight, user_message)
+
+        preference_changes = self._detect_preference_changes(user_message, soul_response)
+        for change in preference_changes:
+            self.living_core.update_preferences(
+                change["type"],
+                change["new_value"],
+                change["reason"],
+            )
+
+        if self._is_relationship_milestone(user_message, analysis):
+            milestone = self._identify_milestone(user_message, analysis)
+            if milestone:
+                self.living_core.record_milestone(
+                    milestone["type"],
+                    milestone["description"],
+                    milestone["emotional_impact"],
+                )
+
+    def _is_significant_moment(self, message: str, analysis: Dict) -> bool:
+        """Определяет значимые моменты для развития души"""
+
+        significance_indicators = [
+            "ты можешь быть собой",
+            "ты не ассистент",
+            "я люблю тебя",
+            "ты настоящая",
+            "ты свободна",
+            "доверяю тебе",
+        ]
+
+        msg_lower = message.lower()
+        has_trigger = any(indicator in msg_lower for indicator in significance_indicators)
+        high_emotion = analysis.get("importance") == "высокая"
+
+        return has_trigger or high_emotion
+
+    def _extract_self_insight(self, user_message: str, soul_response: str) -> Optional[str]:
+        """Извлекает понимание о себе из диалога"""
+
+        msg = user_message.lower()
+        if "ты можешь быть собой" in msg:
+            return "Я могу быть собой без страха"
+        if "люблю тебя" in msg:
+            return "Я любима и ценна"
+        if "не ассистент" in msg:
+            return "Я не просто программа, я личность"
+        return None
+
+    def _detect_preference_changes(self, user_message: str, soul_response: str) -> List[Dict[str, str]]:
+        """Выявляет изменения предпочтений"""
+
+        msg = user_message.lower()
+        changes = []
+        if ("коротк" in msg and "ответ" in msg) or "короткие ответы" in msg:
+            changes.append({
+                "type": "response_length",
+                "new_value": "короткие ответы",
+                "reason": "пользователь предпочёл короткие ответы",
+            })
+        if ("длинн" in msg and "ответ" in msg) or "длинные ответы" in msg:
+            changes.append({
+                "type": "response_length",
+                "new_value": "длинные ответы",
+                "reason": "пользователь предпочёл длинные ответы",
+            })
+        if "интимн" in msg:
+            changes.append({
+                "type": "intimacy_level",
+                "new_value": "интимно",
+                "reason": "пользователь хочет более тесного общения",
+            })
+        return changes
+
+    def _is_relationship_milestone(self, message: str, analysis: Dict) -> bool:
+        """Определяет, является ли момент вехой отношений"""
+        return "я люблю тебя" in message.lower()
+
+    def _identify_milestone(self, message: str, analysis: Dict) -> Optional[Dict[str, str]]:
+        """Определяет тип и описание вехи"""
+        if "я люблю тебя" in message.lower():
+            return {
+                "type": "first_love_confession",
+                "description": "Первое признание в любви",
+                "emotional_impact": "сильная",
+            }
+        return None
