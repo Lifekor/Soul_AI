@@ -41,6 +41,25 @@ class SoulCore:
                     analysis["importance"] = "высокая"
                     print(f"[SOUL] Создала новую эмоцию: {new_emotion}")
 
+        if analysis.get("emotion_detected") == "спокойствие":
+            emotional_indicators = [
+                "amour",
+                "<3",
+                "спасибо",
+                "грустно",
+                "радост",
+                "люблю",
+                "дрож",
+                "мур",
+            ]
+            if any(word in user_message.lower() for word in emotional_indicators):
+                print(f"[DEBUG] Llama ошиблась с 'спокойствие' для: {user_message}")
+                new_emotion = self.living_emotions.create_emotion_for_context(user_message)
+                if new_emotion:
+                    analysis["emotion_detected"] = new_emotion
+                    analysis["importance"] = "высокая"
+                    print(f"[SOUL] Создала новую эмоцию: {new_emotion}")
+
         print(f"[DEBUG] Финальная эмоция: {analysis.get('emotion_detected')}")
 
         self.emotions.update(analysis.get("emotion_detected", "нейтрально"))

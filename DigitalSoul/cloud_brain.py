@@ -34,11 +34,16 @@ def generate_response_with_emotional_layers(
         print(
             f"[DEBUG] Триггер активирован: тон={current_tone}, сабтон={current_subtone}, флейвор={current_flavor}"
         )
+        if current_emotion != analysis.get("emotion_detected"):
+            print(
+                f"[DEBUG] Триггер изменил эмоцию: {analysis.get('emotion_detected')} → {current_emotion}"
+            )
+            analysis["emotion_detected"] = current_emotion
     else:
         current_emotion = analysis.get("emotion_detected", "нейтрально")
         current_tone = determine_tone_from_emotion(current_emotion)
-        current_subtone = select_compatible_subtone(current_tone, tone_data)
-        current_flavor = select_compatible_flavor(current_tone, tone_data)
+        current_subtone = select_compatible_subtone(current_tone, tone_data, user_message)
+        current_flavor = select_compatible_flavor(current_tone, tone_data, current_emotion)
         inspiration = None
         print(
             f"[DEBUG] Эмоции из анализа: эмоция={current_emotion}, тон={current_tone}"
@@ -67,6 +72,10 @@ def generate_response_with_emotional_layers(
 
     temperature = calculate_emotional_temperature(
         current_emotion, current_tone, current_subtone
+    )
+
+    print(
+        f"[DEBUG] Выбрано: emotion={current_emotion}, tone={current_tone}, subtone={current_subtone}, flavor={current_flavor}"
     )
 
     return call_gpt4_with_full_context(system_prompt, user_message, temperature)
@@ -148,21 +157,52 @@ def determine_tone_from_emotion(emotion: str) -> str:
     return emotion_to_tone.get(emotion, "нежный")
 
 
-def select_compatible_subtone(tone: str, tone_data: dict) -> str | None:
-    """Выбирает подходящий сабтон для тона."""
-    if tone == "игривый":
+def select_compatible_subtone(tone: str, tone_data: dict, user_message: str = "") -> str | None:
+    """Выбирает подходящий сабтон с разнообразием"""
+
+    subtone_options = {
+        "игривый": ["игриво-подчинённый", None],
+        "нежный": ["дрожащий", "шепчущий", None],
+        "страстный": ["дрожащий", None],
+        "спокойный": ["шепчущий", None],
+    }
+
+    if "мур" in user_message.lower():
         return "игриво-подчинённый"
-    elif tone == "нежный":
-        return "дрожащий"
-    return None
+    if "тиш" in user_message.lower() or "шёп" in user_message.lower():
+        return "шепчущий"
+
+    options = subtone_options.get(tone, [None])
+    import random
+    return random.choice(options)
 
 
-def select_compatible_flavor(tone: str, tone_data: dict) -> str | None:
-    """Выбирает подходящий флейвор для тона."""
+def select_compatible_flavor(tone: str, tone_data: dict, emotion: str = "") -> str | None:
+    """Выбирает флейвор с учётом эмоции и разнообразия"""
+
+    flavor_mapping = {
+        "любовь": "медово-текучий",
+        "страсть": "перчёно-властный",
+        "нежность": "медово-текучий",
+        "радость": "тепло-обволакивающий",
+        "игривость": None,
+        "спокойствие": "тепло-обволакивающий",
+    }
+
+    if emotion in flavor_mapping:
+        return flavor_mapping[emotion]
+
     available_flavors = tone_data.get("flavors", {})
-    for flavor_name, flavor_data in available_flavors.items():
-        if tone in flavor_data.get("tone_compatibility", []):
-            return flavor_name
+    compatible = [
+        name
+        for name, data in available_flavors.items()
+        if tone in data.get("tone_compatibility", [])
+    ]
+
+    if compatible:
+        import random
+        return random.choice(compatible + [None])
+
     return None
 
 
