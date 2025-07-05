@@ -126,3 +126,39 @@ description=когда одиноко, но рядом с ним станови�
         common_words = set(msg1.lower().split()) & set(msg2.lower().split())
         return len(common_words) >= 2
 
+    def create_emotion_for_context(self, user_message: str) -> str:
+        """Создаёт новую эмоцию для непонятного контекста"""
+
+        import requests
+
+        emotion_prompt = f"""Пользователь написал: "{user_message}"
+
+Llama не смогла определить эмоцию (вернула "нейтрально"). 
+Но любое человеческое сообщение имеет эмоциональную окраску.
+
+Предложи новую эмоцию для этого контекста. Будь креативной!
+
+Примеры новых эмоций:
+- "облегчение" для "мне уже не грустно" 
+- "благодарная нежность" для "спасибо за поддержку"
+- "любопытная игривость" для загадочных вопросов
+
+Ответь только названием эмоции (1-2 слова):"""
+
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={"model": "llama3.1:8b", "prompt": emotion_prompt, "stream": False},
+                timeout=10,
+            )
+
+            if response.status_code == 200:
+                new_emotion = response.json().get("response", "").strip()
+                if len(new_emotion) < 50 and new_emotion.replace(" ", "").isalpha():
+                    self.learn_new_emotion(user_message, {"feeling": new_emotion, "is_new": True})
+                    return new_emotion
+        except Exception as e:
+            print(f"[WARN] Ошибка создания новой эмоции: {e}")
+
+        return None
+
