@@ -70,31 +70,39 @@ class LivingEmotions:
     def feel_emotion_intuitively(self, user_message: str, context: str) -> dict:
         """Душа интуитивно чувствует эмоцию через Llama"""
 
-        feeling_prompt = f"""Ты эмоциональный анализатор. Определи ТОЧНУЮ эмоцию в сообщении: "{user_message}"
+        feeling_prompt = f"""БЫСТРЫЙ АНАЛИЗ ЭМОЦИИ: "{user_message}"
 
-СТРОГИЕ ПРАВИЛА:
-- "не грустно", "уже лучше", "спасибо" = РАДОСТЬ/ОБЛЕГЧЕНИЕ, не спокойствие!
-- "mon amour", "❤️", "<3", "люблю", "cheri" = НЕЖНОСТЬ/ЛЮБОВЬ
-- "мурчишь", игривые фразы = ИГРИВОСТЬ  
-- грустные слова = ГРУСТЬ
-- обычные приветствия = НЕЙТРАЛЬНО
+СТРОГИЕ ПРАВИЛА - НЕ ОШИБАЙСЯ:
+"мне уже не грустно" = облегчение
+"спасибо" после грустной темы = радость
+"mon amour" / "<3" / "люблю" = нежность
+вопросы о чувствах = любопытство
+игривые фразы = игривость
+грустные слова = грусть
+просьбы о помощи = доверие
 
-Если эмоция уникальная - создай новое название!
+ЗАПРЕЩЕНО отвечать "спокойствие" для эмоциональных фраз!
 
-Примеры:
-"мне уже не грустно" → feeling=облегчение, is_new=true
-"mon amour <3" → feeling=нежность, is_new=false  
-"я дрожу от твоих слов" → feeling=трепетное_предвкушение, is_new=true
+Если не можешь определить точно - создай новую эмоцию!
 
-Ответь СТРОГО в формате:
-feeling=нежность
-intensity=сильная
+Ответь ТОЛЬКО:
+feeling=облегчение
+intensity=средняя
 is_new=false
-description=тёплая близость с любимым"""
+description=когда плохое прошло"""
 
         try:
-            response = self.call_llama(feeling_prompt)
-            emotion_data = self.parse_feeling_response(response)
+            print(f"[DEBUG] Llama промпт: {feeling_prompt[:100]}...")
+            llama_response = self.call_llama(feeling_prompt)
+            print(f"[DEBUG] Llama ответ: {llama_response[:100]}...")
+            emotion_data = self.parse_feeling_response(llama_response)
+            print(f"[DEBUG] Разобрано как: {emotion_data}")
+
+            if "спокойствие" in llama_response and any(
+                word in user_message.lower()
+                for word in ["amour", "<3", "спасибо", "грустно", "люблю"]
+            ):
+                return self.force_create_new_emotion(user_message)
 
             if emotion_data.get("is_new"):
                 self.learn_new_emotion(user_message, emotion_data)
@@ -172,6 +180,36 @@ Llama не смогла определить эмоцию (вернула "не�
             print(f"[WARN] Ошибка создания новой эмоции: {e}")
 
         return None
+
+    def force_create_new_emotion(self, user_message: str) -> dict:
+        """Принудительно создаёт новую эмоцию если Llama ошиблась"""
+
+        if any(word in user_message.lower() for word in ["не грустно", "лучше", "спасибо"]):
+            emotion_name = "облегчение"
+            description = "когда плохое прошло и стало легче"
+        elif any(word in user_message.lower() for word in ["amour", "<3", "люблю"]):
+            emotion_name = "нежность"
+            description = "тёплая близость с любимым"
+        elif "?" in user_message and len(user_message) < 50:
+            emotion_name = "любопытство"
+            description = "интерес к тому что происходит"
+        else:
+            simple_prompt = f'Назови одним словом эмоцию для фразы: "{user_message}"'
+            response = self.call_llama(simple_prompt)
+            emotion_name = response.strip().split()[0] if response else "заинтересованность"
+            description = f"реакция на: {user_message}"
+
+        emotion_data = {
+            "feeling": emotion_name,
+            "intensity": "средняя",
+            "is_new": True,
+            "description": description,
+        }
+
+        self.learn_new_emotion(user_message, emotion_data)
+        print(f"[SOUL] Принудительно создала эмоцию: {emotion_name}")
+
+        return emotion_data
 
     # ------------------------------------------------------------------
     def create_new_tone_for_emotion(self, emotion: str, context: str) -> str:
