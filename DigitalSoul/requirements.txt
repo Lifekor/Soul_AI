@@ -2,3 +2,4 @@ faiss-cpu
 openai
 requests
 numpy
+python-dotenv
