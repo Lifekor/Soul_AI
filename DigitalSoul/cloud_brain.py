@@ -23,6 +23,11 @@ def generate_response_with_emotional_layers(
     if trigger_result.get("triggered"):
         current_tone = trigger_result.get("tone")
         current_subtone = trigger_result.get("subtone")
+        if isinstance(current_subtone, list):
+            if current_subtone:
+                current_subtone = current_subtone[0]
+            else:
+                current_subtone = None
         current_flavor = trigger_result.get("flavor")
         current_emotion = trigger_result.get("emotion")
         inspiration = trigger_result.get("inspiration")
@@ -142,6 +147,12 @@ def get_tone_examples(tone: str, data: dict) -> List[str]:
 
 def get_subtone_examples(subtone: str, data: dict) -> List[str]:
     """Возвращает примеры для сабтона."""
+    if not subtone:
+        return []
+    if isinstance(subtone, list):
+        if not subtone:
+            return []
+        subtone = subtone[0]
     return data.get("subtones", {}).get(subtone, {}).get("examples", [])
 
 

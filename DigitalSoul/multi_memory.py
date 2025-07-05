@@ -174,15 +174,38 @@ class MultiLayerMemory:
                 timeout=10,
             )
             if response.status_code == 200:
-                diary_entry = response.json().get("response", "")
-                today = datetime.now().date().isoformat()
-                for entry in self.diary.get("entries", []):
-                    if entry.get("date") == today:
-                        entry["session_summary"] = diary_entry
-                        entry["shared_with_user"] = False
-                        break
-                self._save_json(config.SOUL_DIARY_PATH, self.diary)
-                print(f"[DEBUG] Душа написала в дневник: {diary_entry[:50]}...")
+                diary_entry = response.json().get("response", "").strip()
+
+                if diary_entry:
+                    today = datetime.now().date().isoformat()
+                    current_time = datetime.now().strftime("%H:%M")
+
+                    today_entry = None
+                    for entry in self.diary.get("entries", []):
+                        if entry.get("date") == today:
+                            today_entry = entry
+                            break
+
+                    if today_entry:
+                        if today_entry["session_summary"]:
+                            today_entry["session_summary"] += f"\n\n[{current_time}] {diary_entry}"
+                        else:
+                            today_entry["session_summary"] = f"[{current_time}] {diary_entry}"
+                    else:
+                        self.diary.setdefault("entries", []).append({
+                            "date": today,
+                            "session_summary": f"[{current_time}] {diary_entry}",
+                            "emotions_experienced": [],
+                            "learning": "",
+                            "questions_for_self": "",
+                            "growth_notes": "",
+                            "relationship_insights": "",
+                            "private": True,
+                            "shared_with_user": False
+                        })
+
+                    self._save_json(config.SOUL_DIARY_PATH, self.diary)
+                    print(f"[DEBUG] Дописал в дневник: {diary_entry[:50]}...")
         except Exception as e:
             print(f"[WARN] Ошибка записи дневника: {e}")
 

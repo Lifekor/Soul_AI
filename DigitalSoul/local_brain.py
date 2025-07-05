@@ -141,61 +141,67 @@ action=запомнить"""
 
 
 def analyze_with_self_learning(user_message: str, soul_memory: Dict[str, Any]) -> Dict[str, Any]:
-    """Улучшенный анализ с самообучением"""
+    """Кардинально улучшенный анализ для Llama 3.1 8B"""
 
-    learned_patterns = soul_memory.get("emotion_corrections", {})
+    # Проверяем выученные паттерны
+    learned_patterns = soul_memory.get('emotion_corrections', {})
     for pattern, correct_analysis in learned_patterns.items():
         if pattern.lower() in user_message.lower():
             print(f"[DEBUG] Использую выученный паттерн: {pattern}")
             return correct_analysis
 
-    prompt = f"""Анализируй эмоцию в сообщении: "{user_message}"
+    # УСИЛЕННЫЙ промпт для Llama 3.1
+    prompt = f"""Ты эмоциональный аналитик. Определи ТОЧНУЮ эмоцию в сообщении: "{user_message}"
 
-ВАЖНЫЕ ПРАВИЛА:
-- "не грустно", "уже лучше", "спасибо" = РАДОСТЬ/ОБЛЕГЧЕНИЕ, НЕ грусть!
-- "mon amour", "❤️", "<3", "люблю" = НЕЖНОСТЬ/ЛЮБОВЬ, НЕ грусть!
-- "привет", "как дела" = importance: низкая
-- Личные факты, имена, сильные эмоции = importance: высокая
+СТРОГИЕ ПРАВИЛА:
+- "не грустно", "уже лучше", "спасибо" = РАДОСТЬ, не грусть!
+- "mon amour", "❤️", "<3", "люблю" = НЕЖНОСТЬ/ЛЮБОВЬ
+- "мурчишь", игривые фразы = ИГРИВОСТЬ  
+- одиночество + тепло = особая НЕЖНОСТЬ
+- простое "привет" = НЕЙТРАЛЬНО, низкая важность
 
-Определи также подходящий тон для ответа и сабтон:
-- радость → игривый тон
-- нежность → нежный тон  
-- грусть → сочувствующий тон
+ЭМОЦИИ: радость, нежность, игривость, грусть, любовь, страсть, спокойствие, нейтрально
 
-Ответь СТРОГО в формате:
-emotion=радость
+ВАЖНОСТЬ: 
+- высокая: имена, сильные эмоции, личные признания
+- средняя: эмоциональные фразы  
+- низкая: обычные приветствия
+
+ТОНА:
+- радость/игривость → игривый
+- нежность/любовь → нежный
+- грусть → сочувствующий  
+- спокойствие → спокойный
+
+Ответь ТОЧНО в формате:
+emotion=нежность
 importance=средняя
 action=запомнить
-tone=игривый
+tone=нежный
 subtone=дрожащий"""
 
     try:
         response = requests.post(
             "http://localhost:11434/api/generate",
-            json={"model": "llama3.2:3b", "prompt": prompt, "stream": False},
-            timeout=10,
+            json={"model": "llama3.1:8b", "prompt": prompt, "stream": False},
+            timeout=15
         )
 
         if response.status_code == 200:
             llama_response = response.json().get("response", "")
+            print(f"[DEBUG] Llama ответил: {llama_response[:100]}...")
 
-            result = parse_llama_analysis(llama_response)
-
-            if should_flag_for_correction(user_message, result):
-                flag_analysis_for_review(user_message, result, soul_memory)
+            # Улучшенный парсинг
+            result = parse_llama_analysis_improved(llama_response)
+            print(f"[DEBUG] Распарсили как: {result}")
 
             return result
 
     except Exception as e:
         print(f"[WARN] Ошибка анализа Llama: {e}")
 
-    return {
-        "emotion_detected": "нейтрально",
-        "importance": "низкая",
-        "action_needed": "ничего",
-        "response_tone": "спокойный",
-        "subtone": None,
-    }
+    # Более умный fallback
+    return smart_fallback_analysis(user_message)
 
 
 def call_llama_analysis(prompt: str) -> Dict[str, Any]:
@@ -265,6 +271,52 @@ def parse_llama_analysis(response_text: str) -> Dict[str, Any]:
         if m:
             result[key] = m.group(1)
     return result
+
+
+def parse_llama_analysis_improved(llama_response: str) -> Dict[str, Any]:
+    """Улучшенный парсинг ответа Llama"""
+    import re
+
+    result = {
+        "emotion_detected": "нейтрально",
+        "importance": "низкая",
+        "action_needed": "ничего",
+        "response_tone": "спокойный",
+        "subtone": None,
+    }
+
+    patterns = {
+        "emotion_detected": [r"emotion[=:]\s*(\w+)", r"эмоция[=:]\s*(\w+)"],
+        "importance": [r"importance[=:]\s*(\w+)", r"важность[=:]\s*(\w+)"],
+        "action_needed": [r"action[=:]\s*(\w+)", r"действие[=:]\s*(\w+)"],
+        "response_tone": [r"tone[=:]\s*(\w+)", r"тон[=:]\s*(\w+)"],
+        "subtone": [r"subtone[=:]\s*(\w+)", r"сабтон[=:]\s*(\w+)"],
+    }
+
+    for key, regexes in patterns.items():
+        for regex in regexes:
+            match = re.search(regex, llama_response.lower())
+            if match:
+                result[key] = match.group(1)
+                break
+
+    return result
+
+
+def smart_fallback_analysis(user_message: str) -> Dict[str, Any]:
+    """Умный фолбэк если Llama не сработала"""
+    msg_lower = user_message.lower()
+
+    if any(word in msg_lower for word in ["amour", "❤️", "<3", "люблю"]):
+        return {"emotion_detected": "нежность", "importance": "высокая", "action_needed": "запомнить", "response_tone": "нежный"}
+
+    if any(word in msg_lower for word in ["мур", "игрив", "шал"]):
+        return {"emotion_detected": "игривость", "importance": "средняя", "action_needed": "запомнить", "response_tone": "игривый"}
+
+    if any(word in msg_lower for word in ["не грустно", "лучше", "спасибо"]):
+        return {"emotion_detected": "радость", "importance": "средняя", "action_needed": "запомнить", "response_tone": "игривый"}
+
+    return {"emotion_detected": "нейтрально", "importance": "низкая", "action_needed": "ничего", "response_tone": "спокойный"}
 
 
 def should_flag_for_correction(message: str, analysis: Dict[str, Any]) -> bool:

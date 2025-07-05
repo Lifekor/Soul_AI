@@ -41,8 +41,12 @@ class SoulCore:
 
         conversation_history = self.get_recent_conversation_history()
         memories = self.memory.search_similar(user_message, limit=3)
-        memories.extend(self.multi_memory.search_memories(user_message))
+        multi_memories = self.multi_memory.search_memories(user_message)
+        memories.extend(multi_memories)
         print(f"[DEBUG] Найдено воспоминаний: {len(memories)}")
+        if memories:
+            for i, memory in enumerate(memories[:3], 1):
+                print(f"[DEBUG] Воспоминание {i}: {memory[:50]}...")
 
         if not self.soul_identity.identity.get("name") and len(conversation_history) >= 5:
             new_name = self.soul_identity.choose_name_autonomously(conversation_history)
