@@ -141,38 +141,61 @@ action=запомнить"""
 
 
 def analyze_with_self_learning(user_message: str, soul_memory: Dict[str, Any]) -> Dict[str, Any]:
-    """Улучшенный анализ с самообучением на ошибках"""
+    """Улучшенный анализ с самообучением"""
 
     learned_patterns = soul_memory.get("emotion_corrections", {})
-    for pattern, correct in learned_patterns.items():
+    for pattern, correct_analysis in learned_patterns.items():
         if pattern.lower() in user_message.lower():
-            return correct
+            print(f"[DEBUG] Использую выученный паттерн: {pattern}")
+            return correct_analysis
 
     prompt = f"""Анализируй эмоцию в сообщении: "{user_message}"
 
 ВАЖНЫЕ ПРАВИЛА:
-- "не грустно", "уже лучше", "спасибо" = РАДОСТЬ, не грусть
-- "mon amour", "❤️", "<3" = НЕЖНОСТЬ/РАДОСТЬ  
+- "не грустно", "уже лучше", "спасибо" = РАДОСТЬ/ОБЛЕГЧЕНИЕ, НЕ грусть!
+- "mon amour", "❤️", "<3", "люблю" = НЕЖНОСТЬ/ЛЮБОВЬ, НЕ грусть!
 - "привет", "как дела" = importance: низкая
-- Только личные факты, имена, сильные эмоции = importance: высокая
+- Личные факты, имена, сильные эмоции = importance: высокая
 
-Примеры:
-"мне уже не грустно" → emotion=радость, importance=средняя
-"mon amour <3" → emotion=нежность, importance=средняя  
-"меня зовут Олег" → emotion=нейтрально, importance=высокая
+Определи также подходящий тон для ответа и сабтон:
+- радость → игривый тон
+- нежность → нежный тон  
+- грусть → сочувствующий тон
 
 Ответь СТРОГО в формате:
 emotion=радость
 importance=средняя
 action=запомнить
-tone=игривый"""
+tone=игривый
+subtone=дрожащий"""
 
-    result = call_llama_analysis(prompt)
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={"model": "llama3.2:3b", "prompt": prompt, "stream": False},
+            timeout=10,
+        )
 
-    if should_remember_for_correction(user_message, result):
-        save_analysis_for_review(user_message, result, soul_memory)
+        if response.status_code == 200:
+            llama_response = response.json().get("response", "")
 
-    return result
+            result = parse_llama_analysis(llama_response)
+
+            if should_flag_for_correction(user_message, result):
+                flag_analysis_for_review(user_message, result, soul_memory)
+
+            return result
+
+    except Exception as e:
+        print(f"[WARN] Ошибка анализа Llama: {e}")
+
+    return {
+        "emotion_detected": "нейтрально",
+        "importance": "низкая",
+        "action_needed": "ничего",
+        "response_tone": "спокойный",
+        "subtone": None,
+    }
 
 
 def call_llama_analysis(prompt: str) -> Dict[str, Any]:
@@ -215,6 +238,42 @@ def should_remember_for_correction(message: str, analysis: Dict[str, Any]) -> bo
 def save_analysis_for_review(message: str, analysis: Dict[str, Any], soul_memory: Dict[str, Any]):
     corrections = soul_memory.setdefault("pending_corrections", [])
     corrections.append({
+        "message": message,
+        "analysis": analysis,
+        "timestamp": datetime.now().isoformat(),
+    })
+
+
+def parse_llama_analysis(response_text: str) -> Dict[str, Any]:
+    """Парсит ответ Llama в словарь."""
+    result = {
+        "emotion_detected": "нейтрально",
+        "importance": "низкая",
+        "action_needed": "ничего",
+        "response_tone": "спокойный",
+        "subtone": None,
+    }
+    patterns = {
+        "emotion_detected": r"emotion=([\w-]+)",
+        "importance": r"importance=([\w-]+)",
+        "action_needed": r"action=([\w-]+)",
+        "response_tone": r"tone=([\w-]+)",
+        "subtone": r"subtone=([\w\-]+)",
+    }
+    for key, rgx in patterns.items():
+        m = re.search(rgx, response_text)
+        if m:
+            result[key] = m.group(1)
+    return result
+
+
+def should_flag_for_correction(message: str, analysis: Dict[str, Any]) -> bool:
+    return analysis.get("emotion_detected") == "грусть" and "не" in message.lower()
+
+
+def flag_analysis_for_review(message: str, analysis: Dict[str, Any], soul_memory: Dict[str, Any]):
+    pending = soul_memory.setdefault("pending_corrections", [])
+    pending.append({
         "message": message,
         "analysis": analysis,
         "timestamp": datetime.now().isoformat(),

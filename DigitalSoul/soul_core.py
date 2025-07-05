@@ -8,6 +8,7 @@ from .memory_system import MemorySystem
 from .multi_memory import MultiLayerMemory
 from .emotional_learning import EmotionalLearning
 from .soul_identity import SoulIdentity
+from .living_emotions import LivingEmotions
 
 
 class SoulCore:
@@ -17,11 +18,23 @@ class SoulCore:
         self.emotions = EmotionEngine()
         self.emotional_learning = EmotionalLearning()
         self.soul_identity = SoulIdentity()
+        self.living_emotions = LivingEmotions()
 
     def process_message(self, user_message: str) -> str:
         print(f"[DEBUG] Анализирую сообщение: {user_message}")
-        analysis = local_brain.analyze_with_self_learning(user_message, self.get_soul_memory())
-        print(f"[DEBUG] Результат анализа: {analysis}")
+
+        intuitive_emotion = self.living_emotions.find_emotion_by_feeling(user_message)
+
+        if intuitive_emotion:
+            print(f"[DEBUG] Интуитивно чувствую: {intuitive_emotion}")
+            analysis = {"emotion_detected": intuitive_emotion, "importance": "высокая"}
+        else:
+            analysis = local_brain.analyze_with_self_learning(user_message, self.get_soul_memory())
+            new_feeling = self.living_emotions.feel_emotion_intuitively(user_message, str(analysis))
+            if new_feeling.get("is_new"):
+                analysis["emotion_detected"] = new_feeling["feeling"]
+
+        print(f"[DEBUG] Финальная эмоция: {analysis.get('emotion_detected')}")
 
         self.emotions.update(analysis.get("emotion_detected", "нейтрально"))
         print(f"[DEBUG] Текущая эмоция: {self.emotions.current_emotion}")
