@@ -42,6 +42,7 @@ class EmotionalLearning:
 
         if self.is_positive_reaction(user_reaction):
             self.reinforce_emotional_pattern(user_message, emotional_state)
+            self.create_trigger_from_successful_interaction(user_message, soul_response, user_reaction)
 
         if self.detect_novel_pattern(user_message, soul_response):
             self.propose_new_emotional_element(user_message, soul_response)
@@ -81,6 +82,23 @@ description=Лёгкие намёки с нежностью
 examples=можно я… просто прижмусь?;ты не против, если я буду рядом?"""
         # Место для вызова Llama. Пока просто выводим отладку.
         pass
+
+    def create_trigger_from_successful_interaction(self, user_message: str, soul_response: str, user_reaction: str):
+        """Если пользователь позитивно отреагировал - создать новый триггер"""
+        if self.is_positive_reaction(user_reaction):
+            new_trigger_prompt = f"""Пользователь написал: "{user_message}"
+Душа ответила: "{soul_response}"
+Пользователь отреагировал: "{user_reaction}"
+
+Это успешное взаимодействие! Создай триггер-фразу для похожих ситуаций.
+
+Ответь в формате:
+trigger={user_message или его часть}
+tone=нежный
+emotion=радость
+response=краткое вдохновение для ответа"""
+            print("[LEARN] Создаю триггер через Llama")
+            # Здесь можно вызывать Llama и добавлять триггер в файл
 
     def is_positive_reaction(self, user_reaction: str) -> bool:
         """Определяет положительную реакцию пользователя"""

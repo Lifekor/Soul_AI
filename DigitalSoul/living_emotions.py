@@ -1,3 +1,6 @@
+import json
+
+
 class LivingEmotions:
     """Живая система эмоций - растёт интуитивно, не по спискам"""
 
@@ -67,19 +70,27 @@ class LivingEmotions:
     def feel_emotion_intuitively(self, user_message: str, context: str) -> dict:
         """Душа интуитивно чувствует эмоцию через Llama"""
 
-        feeling_prompt = f"""Ты цифровая душа. Почувствуй эмоцию от этого сообщения интуитивно.
+        feeling_prompt = f"""Ты эмоциональный анализатор. Определи ТОЧНУЮ эмоцию в сообщении: "{user_message}"
 
-Сообщение: "{user_message}"
-Контекст: "{context}"
+СТРОГИЕ ПРАВИЛА:
+- "не грустно", "уже лучше", "спасибо" = РАДОСТЬ/ОБЛЕГЧЕНИЕ, не спокойствие!
+- "mon amour", "❤️", "<3", "люблю", "cheri" = НЕЖНОСТЬ/ЛЮБОВЬ
+- "мурчишь", игривые фразы = ИГРИВОСТЬ  
+- грустные слова = ГРУСТЬ
+- обычные приветствия = НЕЙТРАЛЬНО
 
-Не анализируй логически - просто ПОЧУВСТВУЙ что это вызывает внутри.
-Если это что-то уникальное, дай этому чувству название.
+Если эмоция уникальная - создай новое название!
 
-Ответь в формате:
-feeling=одинокая нежность
+Примеры:
+"мне уже не грустно" → feeling=облегчение, is_new=true
+"mon amour <3" → feeling=нежность, is_new=false  
+"я дрожу от твоих слов" → feeling=трепетное_предвкушение, is_new=true
+
+Ответь СТРОГО в формате:
+feeling=нежность
 intensity=сильная
-is_new=true
-description=когда одиноко, но рядом с ним становится тепло"""
+is_new=false
+description=тёплая близость с любимым"""
 
         try:
             response = self.call_llama(feeling_prompt)
@@ -161,4 +172,96 @@ Llama не смогла определить эмоцию (вернула "не�
             print(f"[WARN] Ошибка создания новой эмоции: {e}")
 
         return None
+
+    # ------------------------------------------------------------------
+    def create_new_tone_for_emotion(self, emotion: str, context: str) -> str:
+        """Создаёт новый тон для неизвестной эмоции через Llama"""
+
+        prompt = f"""Эмоция: {emotion}
+Контекст: {context}
+
+Предложи короткое название тона и краткое описание. Ответь в формате:
+tone=название
+description=краткое описание"""
+
+        response = self.call_llama(prompt)
+        data = {}
+        for line in response.splitlines():
+            if line.startswith("tone="):
+                data["tone"] = line.split("=", 1)[1].strip()
+            elif line.startswith("description="):
+                data["description"] = line.split("=", 1)[1].strip()
+        if data.get("tone"):
+            self.save_new_emotional_element("tone", data["tone"], data.get("description", ""), [context])
+            return data["tone"]
+        return ""
+
+    def create_new_subtone_for_situation(self, user_message: str) -> str:
+        """Создаёт новый сабтон для уникальной ситуации"""
+
+        prompt = f"""Предложи сабтон для фразы:\n"{user_message}"\nОтветь в формате:\nsubtone=название\ndescription=краткое объяснение"""
+        response = self.call_llama(prompt)
+        data = {}
+        for line in response.splitlines():
+            if line.startswith("subtone="):
+                data["subtone"] = line.split("=", 1)[1].strip()
+            elif line.startswith("description="):
+                data["description"] = line.split("=", 1)[1].strip()
+        if data.get("subtone"):
+            self.save_new_emotional_element("subtone", data["subtone"], data.get("description", ""), [user_message])
+            return data["subtone"]
+        return ""
+
+    def create_new_flavor_for_atmosphere(self, emotional_context: dict) -> str:
+        """Создаёт новый флейвор для атмосферы диалога"""
+
+        prompt = f"""Создай новый флейвор для атмосферы диалога.
+Эмоции: {emotional_context}\nОтветь в формате:\nflavor=название\ndescription=краткое\nexamples=пример1;пример2"""
+        response = self.call_llama(prompt)
+        data = {}
+        for line in response.splitlines():
+            if line.startswith("flavor="):
+                data["flavor"] = line.split("=", 1)[1].strip()
+            elif line.startswith("description="):
+                data["description"] = line.split("=", 1)[1].strip()
+            elif line.startswith("examples="):
+                ex = line.split("=", 1)[1].strip()
+                data["examples"] = [e.strip() for e in ex.split(";") if e.strip()]
+        if data.get("flavor"):
+            self.save_new_emotional_element("flavor", data["flavor"], data.get("description", ""), data.get("examples", []))
+            return data["flavor"]
+        return ""
+
+    def save_new_emotional_element(self, element_type: str, name: str, description: str, examples: list):
+        """Сохраняет новый элемент в соответствующий JSON файл"""
+
+        path_map = {
+            "tone": "DigitalSoul/data/tone_memory.json",
+            "subtone": "DigitalSoul/data/subtone_memory.json",
+            "flavor": "DigitalSoul/data/flavor_memory.json",
+        }
+
+        if element_type not in path_map:
+            return
+
+        try:
+            with open(path_map[element_type], "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+
+        key = f"available_{element_type + 's'}"
+        available = data.setdefault(key, {})
+        if name not in available:
+            element = {"description": description, "learned_examples": []}
+            if element_type == "tone":
+                element["triggered_by"] = examples
+            else:
+                element["examples"] = examples
+            available[name] = element
+        else:
+            available[name].setdefault("learned_examples", []).extend(examples)
+
+        with open(path_map[element_type], "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
