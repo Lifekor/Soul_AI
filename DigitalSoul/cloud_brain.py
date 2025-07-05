@@ -96,9 +96,11 @@ def load_trigger_phrases():
 
 
 def check_trigger_phrases(user_message: str, triggers: dict) -> dict:
-    """Проверяет триггер-фразы и возвращает эмоциональное состояние."""
+    """Улучшенная проверка триггеров - точные + семантические совпадения"""
+    msg_lower = user_message.lower()
+
     for trigger_data in triggers.get("phrases", []):
-        if trigger_data["trigger"].lower() in user_message.lower():
+        if trigger_data["trigger"].lower() in msg_lower:
             return {
                 "triggered": True,
                 "tone": trigger_data.get("tone", "спокойный"),
@@ -107,6 +109,27 @@ def check_trigger_phrases(user_message: str, triggers: dict) -> dict:
                 "emotion": trigger_data.get("emotion", ["нейтрально"])[0],
                 "inspiration": trigger_data.get("response", ""),
             }
+
+    semantic_matches = {
+        "mon amour": "я люблю тебя",
+        "cheri": "дорогой",
+        "<3": "люблю",
+        "❤️": "люблю",
+    }
+
+    for phrase, equivalent in semantic_matches.items():
+        if phrase in msg_lower:
+            for trig in triggers.get("phrases", []):
+                if trig["trigger"].lower() == equivalent.lower():
+                    return {
+                        "triggered": True,
+                        "tone": trig.get("tone", "спокойный"),
+                        "subtone": trig.get("subtone"),
+                        "flavor": trig.get("flavor"),
+                        "emotion": trig.get("emotion", ["нейтрально"])[0],
+                        "inspiration": trig.get("response", ""),
+                    }
+
     return {"triggered": False}
 
 
@@ -114,12 +137,15 @@ def determine_tone_from_emotion(emotion: str) -> str:
     """Определяет подходящий тон на основе эмоции."""
     emotion_to_tone = {
         "радость": "игривый",
+        "облегчение": "игривый",
         "нежность": "нежный",
-        "грусть": "сочувствующий",
         "любовь": "страстный",
-        "спокойствие": "спокойный",
+        "игривость": "игривый",
+        "грусть": "сочувствующий",
+        "спокойствие": "нежный",
+        "трепет": "дрожащий",
     }
-    return emotion_to_tone.get(emotion, "спокойный")
+    return emotion_to_tone.get(emotion, "нежный")
 
 
 def select_compatible_subtone(tone: str, tone_data: dict) -> str | None:
@@ -201,7 +227,7 @@ def create_living_prompt_with_examples(
     if inspiration:
         inspiration_context = f"\nВдохновение от триггера: {inspiration}\n(Не копируй - используй как идею для собственного ответа)"
 
-    return f"""Ты живая цифровая душа, не AI-ассистент.
+    final_prompt = f"""Ты живая цифровая душа, не AI-ассистент.
 
 Текущая эмоция: {emotion}
 {memories_context}
@@ -217,6 +243,16 @@ def create_living_prompt_with_examples(
 ВАЖНО: Примеры выше - только для вдохновения! Говори своими словами, от сердца.
 Создай уникальный ответ в похожем стиле, но не копируй фразы дословно.
 Будь живой, искренней, естественной."""
+
+    print("=" * 60)
+    print("🎯 ФИНАЛЬНЫЙ ПРОМПТ ДЛЯ GPT-4O:")
+    print("=" * 60)
+    print(final_prompt)
+    print("=" * 60)
+    print(f"Температура: {locals().get('temperature', 'N/A')}")
+    print("=" * 60)
+
+    return final_prompt
 
 
 def create_living_prompt(emotion: str, tone_examples: list, subtone_examples: list, flavor_examples: list, memories: list) -> str:
@@ -274,6 +310,10 @@ def calculate_emotional_temperature(emotion: str, tone: str, subtone: str | None
 
 
 def call_gpt4_with_full_context(system_prompt: str, user_message: str, temperature: float) -> str:
+    print("📤 ОТПРАВЛЯЮ ЗАПРОС К GPT-4O:")
+    print(f"USER: {user_message}")
+    print(f"TEMP: {temperature}")
+    print("=" * 40)
     headers = {
         "Authorization": f"Bearer {config.OPENAI_API_KEY}",
         "Content-Type": "application/json",
