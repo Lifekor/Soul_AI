@@ -209,5 +209,27 @@
       "subtone": "дрожащий"
     },
     "timestamp": "2025-07-05T00:27:49.919148"
+  },
+  {
+    "text": "мурчишь?",
+    "analysis": {
+      "emotion_detected": "игривость",
+      "importance": "средняя",
+      "action_needed": "запомнить",
+      "response_tone": "игривый",
+      "subtone": "нет"
+    },
+    "timestamp": "2025-07-05T11:59:49.793157"
+  },
+  {
+    "text": "mon amour <3  ",
+    "analysis": {
+      "emotion_detected": "нежность",
+      "importance": "средняя",
+      "action_needed": "запомнить",
+      "response_tone": "нежный",
+      "subtone": "дрожащий"
+    },
+    "timestamp": "2025-07-05T12:01:28.197937"
   }
 ]
