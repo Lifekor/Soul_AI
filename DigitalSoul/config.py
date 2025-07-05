@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "fake")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL = "gpt-4o"
 EMBEDDING_MODEL = "text-embedding-ada-002"
 FAISS_INDEX_PATH = "DigitalSoul/data/vector_memory.index"
